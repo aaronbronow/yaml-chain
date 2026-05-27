@@ -58,14 +58,14 @@ assert_fail() {
 echo -e "\n${colors_bold}Test 1: Happy Path Integration${colors_reset}"
 
 # Init
-assert_success "$cli_exe init $run_dir/happy.yaml -d \$'version: 1.0.0\nauthor: Aaron'"
+assert_success "$cli_exe init $run_dir/happy.yaml -d \$'author: Aaron\nrole: Initiator'"
 
 # Verify
 assert_success "$cli_exe verify $run_dir/happy.yaml"
 
 # Append
-assert_success "$cli_exe append $run_dir/happy.yaml -d \$'version: 1.1.0\nchanges:\n  - Refactored core'"
-assert_success "$cli_exe append $run_dir/happy.yaml -d \$'version: 1.2.0\nchanges:\n  - Added tests'"
+assert_success "$cli_exe append $run_dir/happy.yaml -d \$'author: Bob\nrole: Receiver'"
+assert_success "$cli_exe append $run_dir/happy.yaml -d \$'author: Carol\nrole: Observer'"
 
 # Verify again
 assert_success "$cli_exe verify $run_dir/happy.yaml"

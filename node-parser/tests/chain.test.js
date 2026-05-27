@@ -22,7 +22,7 @@ describe('YAML Chain Engine Tests', () => {
   afterEach(cleanup);
 
   test('should initialize a valid genesis chain', async () => {
-    const initialData = 'title: Genesis Block\nauthor: Aaron\n';
+    const initialData = 'author: Aaron\nrole: Initiator\n';
     const meta = await initChain(TEST_FILE, initialData);
 
     assert.strictEqual(meta.block_index, 0);
@@ -42,9 +42,9 @@ describe('YAML Chain Engine Tests', () => {
   });
 
   test('should append blocks and preserve cryptographic link', async () => {
-    await initChain(TEST_FILE, 'block: genesis\n');
+    await initChain(TEST_FILE, 'author: Aaron\nrole: Initiator\n');
     
-    const block1Data = 'block: first_append\ncontent: "hello world"\n';
+    const block1Data = 'author: Bob\nrole: Receiver\n';
     const meta1 = await appendBlock(TEST_FILE, block1Data);
 
     assert.strictEqual(meta1.block_index, 1);
@@ -52,7 +52,7 @@ describe('YAML Chain Engine Tests', () => {
     assert.ok(meta1.meta_hash);
     assert.strictEqual(meta1.data_hash, sha256(block1Data.trim()));
 
-    const block2Data = 'block: second_append\nitems:\n  - item1\n  - item2\n';
+    const block2Data = 'author: Carol\nrole: Observer\n';
     const meta2 = await appendBlock(TEST_FILE, block2Data);
 
     assert.strictEqual(meta2.block_index, 2);
@@ -68,14 +68,14 @@ describe('YAML Chain Engine Tests', () => {
   });
 
   test('should detect tampering in data payload', async () => {
-    await initChain(TEST_FILE, 'block: genesis\ndata: 100\n');
-    await appendBlock(TEST_FILE, 'block: first_append\ndata: 200\n');
+    await initChain(TEST_FILE, 'author: Aaron\nrole: Initiator\n');
+    await appendBlock(TEST_FILE, 'author: Bob\nrole: Receiver\n');
 
     // Read the file and modify a value in Block 0
     let content = await fs.readFile(TEST_FILE, 'utf8');
     
-    // Replace 'data: 100' with 'data: 999'
-    const tamperedContent = content.replace('data: 100', 'data: 999');
+    // Replace 'author: Aaron' with 'author: Eve'
+    const tamperedContent = content.replace('author: Aaron', 'author: Eve');
     await fs.writeFile(TEST_FILE, tamperedContent, 'utf8');
 
     // Verification should fail
@@ -87,7 +87,7 @@ describe('YAML Chain Engine Tests', () => {
   });
 
   test('should detect tampering in block metadata', async () => {
-    await initChain(TEST_FILE, 'block: genesis\n');
+    await initChain(TEST_FILE, 'author: Aaron\nrole: Initiator\n');
     
     // Read the file and change block index in Block 0 metadata
     let content = await fs.readFile(TEST_FILE, 'utf8');
@@ -102,8 +102,8 @@ describe('YAML Chain Engine Tests', () => {
   });
 
   test('should detect broken blockchain link', async () => {
-    await initChain(TEST_FILE, 'block: genesis\n');
-    await appendBlock(TEST_FILE, 'block: append 1\n');
+    await initChain(TEST_FILE, 'author: Aaron\nrole: Initiator\n');
+    await appendBlock(TEST_FILE, 'author: Bob\nrole: Receiver\n');
     
     // Read the file and alter prev_meta_hash of Block 1
     let content = await fs.readFile(TEST_FILE, 'utf8');

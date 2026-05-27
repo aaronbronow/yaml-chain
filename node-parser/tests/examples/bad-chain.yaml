@@ -1,24 +1,35 @@
-version: 1.0.0
 author: Eve
+role: Initiator
 ---
 $yaml-chain-meta:
   version: 1.0.0
   block_index: 0
-  timestamp: 2026-05-27T19:00:27.390Z
+  timestamp: 2026-05-27T20:56:41.117Z
   hashing_strategy: raw
-  data_hash: b4b17978e9fe86d4e647f9f0ac98e0f0112f6e156f3a7f824e9c35dad0eda7e0
+  data_hash: a2baa3b512c9c6aa11e1df77877afcf51eac0930d9016cd0e021a8d59ae82873
   prev_meta_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-  meta_hash: 7a7f44bcfb9eadba875cef153d2785bb027aaffc9ecf39de5c49231238fd0f66
+  meta_hash: 2166860c43e415954232e81a100a65a18b032646814f0bd795ac7c08d7dd110b
 ---
-version: 1.1.0
-changes:
-  - Improved parsing logic
+author: Bob
+role: Receiver
 ---
 $yaml-chain-meta:
   version: 1.0.0
   block_index: 1
-  timestamp: 2026-05-27T19:00:27.468Z
+  timestamp: 2026-05-27T20:56:41.186Z
   hashing_strategy: raw
-  data_hash: 7071bb7ea1848540cb9c65c43ca38ddaec0a4c500a0bd41e19526e54f6de0362
-  prev_meta_hash: 7a7f44bcfb9eadba875cef153d2785bb027aaffc9ecf39de5c49231238fd0f66
-  meta_hash: a0b474ae625f9a644762a090e3fa60c2aa7f228c1d9d670585e08e4ac544375c
+  data_hash: 8c3b77c639dc9ebbdb3f049c6bd300c49c2a34b88ada9a8abae0f3042deebc48
+  prev_meta_hash: 2166860c43e415954232e81a100a65a18b032646814f0bd795ac7c08d7dd110b
+  meta_hash: e5bf978a7d36d533b093d8645f164f3c38fe499c0c720b508dd88ac8008aadd8
+---
+author: Carol
+role: Observer
+---
+$yaml-chain-meta:
+  version: 1.0.0
+  block_index: 2
+  timestamp: 2026-05-27T20:56:41.258Z
+  hashing_strategy: raw
+  data_hash: fb659802a109641c30636c0ebd957533a07eaea7b82dcd029386b8458ac67c4f
+  prev_meta_hash: e5bf978a7d36d533b093d8645f164f3c38fe499c0c720b508dd88ac8008aadd8
+  meta_hash: cc2b7d87445a2cd9c5da21e50007df0fb092a8e44c8ff06e3081661b8c483e10

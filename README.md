@@ -45,6 +45,12 @@ If the file is tampered, the CLI instantly reports the exact tampered block inde
 node bin/yaml-chain.js verify test.yaml --diff
 ```
 
+#### ⚡ Command Shortcuts (md5sum-style)
+The CLI has built-in intelligent routing that lets you verify files directly without subcommands:
+- **Standard Verification**: `node bin/yaml-chain.js test.yaml` (automatically routes to `verify test.yaml`)
+- **Cross-File Verification**: `node bin/yaml-chain.js test-bad.yaml test-good.yaml` (automatically routes to `verify test-bad.yaml -c test-good.yaml` to show original vs tampered diff)
+
+
 ### View Status & Metadata
 Display block counts, file health, and latest block metrics:
 ```bash

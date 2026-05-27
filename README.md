@@ -9,49 +9,21 @@ A secure, multi-document cryptographic blockchain proof of concept. This reposit
 The core concept is to verify how different programming languages and parser strategies (e.g. raw streams vs. parsed ASTs) handle cryptographic integrity. We implement four parser engines under the same standard linking rules:
 
 1. **`node-parser/`** (Node.js Stream Engine)
-   - **Strategy**: Constant-memory $O(1)$ stream parser.
+   - **Strategy**: Constant-memory stream parser.
+   - **Complexity**: **$O(1)$ Memory**, **$O(N)$ Time**. Bounded constant memory with linear execution time.
    - **Strictness**: Raw-byte strict. Any modification (including whitespace, formatting, or comments) will fail verification.
 2. **`yaml-parser/`** (Node.js AST Engine)
    - **Strategy**: Full AST-based parser loading documents into a memory graph.
+   - **Complexity**: **$O(N)$ Memory**, **$O(N)$ Time**. Linear memory consumption matching overall chain file size.
    - **Strictness**: Lossy semantic parser. Normalizes documents into pure JSON structures before verification, discarding local formatting and comments.
 3. **`bash-parser/`** (Bash Shell Engine)
    - **Strategy**: Lightweight Unix CLI utility using standard shell tools (`awk`, `sed`, `sha256sum`).
+   - **Complexity**: **$O(1)$ Memory**, **$O(N^2)$ Time**. Classic time-memory trade-off: streaming processes limit memory to constant bounds, but repeated doc scanning runs in quadratic time.
    - **Strictness**: Raw-byte strict.
 4. **`ys-parser/`** (YAMLScript/Clojure AST Engine)
    - **Strategy**: Native Clojure/YAMLScript compiler and JVM environment.
+   - **Complexity**: **$O(N)$ Memory**, **$O(N)$ Time**. JVM AST memory footprint scaled with document graph size.
    - **Strictness**: Lossy semantic parser. Modularized into separate command files in `src/` and assembled on `make`.
-
----
-
-## 📂 Project Architecture
-
-```text
-/home/aaron/dev/scratch/yaml-chain/
-├── Makefile                    # Multi-parser orchestration & build pipelines
-├── node-parser/                # Core stream-based Node.js parser
-│   ├── bin/yaml-chain.js       # CLI entry point
-│   ├── src/                    # LCS diff verifier logic
-│   └── package.json
-├── yaml-parser/                # AST-based Node.js parser
-│   ├── bin/yaml-chain.js       # CLI entry point
-│   ├── src/                    # AST & JSON normalizer
-│   └── package.json
-├── bash-parser/                # Portable Unix shell implementation
-│   └── yaml-chain.sh           # Executable shell verifier
-├── ys-parser/                  # Modular Clojure-based YAMLScript implementation
-│   ├── yaml-chain.ys           # [GENERATED] Assembled shebang-driven executable
-│   └── src/                    # Modular command source files
-│       ├── header.ys           # Standard hashing logic
-│       ├── init.ys             # init command logic
-│       ├── append.ys           # append command logic
-│       ├── verify.ys           # verify command logic
-│       ├── status.ys           # status command logic
-│       ├── show.ys             # show command logic
-│       └── main.ys             # CLI routing logic
-└── tests/                      # Automated multi-parser test suite
-    ├── shared-tests.sh         # Standardized happy path and tamper tests
-    └── cosmetic-test.sh        # Cosmetic comment divergence validator
-```
 
 ---
 

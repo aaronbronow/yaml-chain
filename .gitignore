@@ -1,5 +1,5 @@
 node_modules/
-test.yaml
+example.yaml
 temp_test_chain.yaml
 .DS_Store
 npm-debug.log*

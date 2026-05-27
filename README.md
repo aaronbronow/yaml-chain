@@ -22,14 +22,14 @@ npm install
 ### Initialize a New Chain
 Initialize a new YAML chain file with a genesis block:
 ```bash
-node bin/yaml-chain.js init test.yaml -d "version: 1.0.0
+node bin/yaml-chain.js init example.yaml -d "version: 1.0.0
 author: Aaron"
 ```
 
 ### Append a Block
 Append a new document block:
 ```bash
-node bin/yaml-chain.js append test.yaml -d "version: 1.1.0
+node bin/yaml-chain.js append example.yaml -d "version: 1.1.0
 changes:
   - Added new features"
 ```
@@ -37,36 +37,36 @@ changes:
 ### Verify Chain Integrity
 Verify that the entire chain is cryptographically intact and has not been modified:
 ```bash
-node bin/yaml-chain.js verify test.yaml
+node bin/yaml-chain.js verify example.yaml
 ```
 
 If the file is tampered, the CLI instantly reports the exact tampered block index and component (e.g. data or meta). You can also run with `--diff` to see how it compares to the previous block:
 ```bash
-node bin/yaml-chain.js verify test.yaml --diff
+node bin/yaml-chain.js verify example.yaml --diff
 ```
 
 #### ⚡ Command Shortcuts (md5sum-style)
 The CLI has built-in intelligent routing that lets you verify files directly without subcommands:
-- **Standard Verification**: `node bin/yaml-chain.js test.yaml` (automatically routes to `verify test.yaml`)
+- **Standard Verification**: `node bin/yaml-chain.js example.yaml` (automatically routes to `verify example.yaml`)
 - **Cross-File Verification**: `node bin/yaml-chain.js test-bad.yaml test-good.yaml` (automatically routes to `verify test-bad.yaml -c test-good.yaml` to show original vs tampered diff)
 
 
 ### View Status & Metadata
 Display block counts, file health, and latest block metrics:
 ```bash
-node bin/yaml-chain.js status test.yaml
+node bin/yaml-chain.js status example.yaml
 ```
 
 ### Show Block Payload
 Display the raw payload of a specific block:
 ```bash
-node bin/yaml-chain.js show test.yaml 0
+node bin/yaml-chain.js show example.yaml 0
 ```
 
 ### Diff Any Two Blocks
 Compare any two data blocks inside the chain:
 ```bash
-node bin/yaml-chain.js diff test.yaml --block-a 0 --block-b 1
+node bin/yaml-chain.js diff example.yaml --block-a 0 --block-b 1
 ```
 
 ## Running Tests

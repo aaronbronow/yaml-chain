@@ -1,7 +1,10 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import readline from 'node:readline';
 import path from 'node:path';
 import YAML from 'yaml';
 import { sha256, deterministicMetaHash } from './hash.js';
+
 
 export const GENESIS_PREV_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
@@ -145,115 +148,168 @@ export async function appendBlock(filepath, dataText) {
  * @param {string} filepath - Path to the file to verify
  * @returns {Promise<VerificationReport>} Verification result
  */
-export async function verifyChain(filepath) {
-  let fileContent = '';
+/**
+ * Private helper to cryptographically verify a single document block pair.
+ */
+function verifySingleBlock(i, dataDocStr, metaDocStr, expectedPrevHash) {
+  let parsed;
   try {
-    fileContent = await fs.readFile(filepath, 'utf8');
+    parsed = YAML.parse(metaDocStr);
+  } catch (e) {
+    return {
+      valid: false,
+      reason: `Failed to parse metadata document at block ${i} as valid YAML.`,
+      blockIndex: i,
+      tamperedComponent: 'meta'
+    };
+  }
+  
+  const meta = parsed?.['$yaml-chain-meta'];
+  if (!meta) {
+    return {
+      valid: false,
+      reason: `Metadata document at block ${i} is missing the '$yaml-chain-meta' root key.`,
+      blockIndex: i,
+      tamperedComponent: 'meta'
+    };
+  }
+  
+  // 1. Verify index
+  if (meta.block_index !== i) {
+    return {
+      valid: false,
+      reason: `Block index mismatch at block ${i}: metadata says index is ${meta.block_index}.`,
+      blockIndex: i,
+      tamperedComponent: 'index',
+      expected: i,
+      actual: meta.block_index
+    };
+  }
+  
+  // 2. Verify previous meta hash
+  if (meta.prev_meta_hash !== expectedPrevHash) {
+    return {
+      valid: false,
+      reason: `Blockchain link broken at block ${i}: expected prev_meta_hash to be '${expectedPrevHash}', but found '${meta.prev_meta_hash}'.`,
+      blockIndex: i,
+      tamperedComponent: 'chain',
+      expected: expectedPrevHash,
+      actual: meta.prev_meta_hash
+    };
+  }
+  
+  // 3. Verify data hash
+  const computedDataHash = sha256(dataDocStr.trim());
+  if (meta.data_hash !== computedDataHash) {
+    return {
+      valid: false,
+      reason: `Cryptographic mismatch in data payload at block ${i}: calculated hash is '${computedDataHash}', but metadata signature has '${meta.data_hash}'.`,
+      blockIndex: i,
+      tamperedComponent: 'data',
+      expected: meta.data_hash,
+      actual: computedDataHash,
+      dataText: dataDocStr
+    };
+  }
+  
+  // 4. Verify meta signature itself
+  const computedMetaHash = deterministicMetaHash(meta);
+  if (meta.meta_hash !== computedMetaHash) {
+    return {
+      valid: false,
+      reason: `Cryptographic mismatch in metadata signature itself at block ${i}: calculated signature is '${computedMetaHash}', but block contains '${meta.meta_hash}'.`,
+      blockIndex: i,
+      tamperedComponent: 'meta',
+      expected: computedMetaHash,
+      actual: meta.meta_hash
+    };
+  }
+
+  return { valid: true, metaHash: meta.meta_hash };
+}
+
+export async function verifyChain(filepath) {
+  try {
+    await fs.stat(filepath);
   } catch (err) {
     if (err.code === 'ENOENT') {
       return { valid: false, reason: `File not found: ${filepath}`, tamperedComponent: 'structure' };
     }
     throw err;
   }
-  
-  const docs = splitRawDocuments(fileContent);
-  if (docs.length === 0) {
-    return { valid: false, reason: 'File is completely empty.', tamperedComponent: 'structure' };
-  }
-  
-  if (docs.length % 2 !== 0) {
-    return {
-      valid: false,
-      reason: `Chain structure is malformed. Expected pairs of [data, meta] documents, but found ${docs.length} total documents.`,
-      tamperedComponent: 'structure'
-    };
-  }
-  
-  const blockCount = docs.length / 2;
+
+  const fileStream = fsSync.createReadStream(filepath);
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+  let blockIndex = 0;
+  let isDataDoc = true;
+  let currentLines = [];
   let expectedPrevHash = GENESIS_PREV_HASH;
-  
-  for (let i = 0; i < blockCount; i++) {
-    const dataDocStr = docs[2 * i];
-    const metaDocStr = docs[2 * i + 1];
-    
-    // Parse metadata document
-    let parsed;
-    try {
-      parsed = YAML.parse(metaDocStr);
-    } catch (e) {
+  let docsCount = 0;
+  let currentBlockData = '';
+
+  try {
+    for await (const line of rl) {
+      if (/^---\s*$/.test(line)) {
+        docsCount++;
+        const currentDocStr = currentLines.join('\n');
+        currentLines = [];
+        
+        if (isDataDoc) {
+          currentBlockData = currentDocStr;
+          isDataDoc = false;
+        } else {
+          // Verify meta document and link back
+          const blockReport = verifySingleBlock(blockIndex, currentBlockData, currentDocStr, expectedPrevHash);
+          if (!blockReport.valid) {
+            fileStream.destroy();
+            return blockReport;
+          }
+          
+          expectedPrevHash = blockReport.metaHash;
+          blockIndex++;
+          isDataDoc = true;
+        }
+      } else {
+        currentLines.push(line);
+      }
+    }
+
+    // Process remaining lines for the final block
+    if (currentLines.length > 0 || docsCount > 0) {
+      docsCount++;
+      const currentDocStr = currentLines.join('\n');
+      if (isDataDoc) {
+        return {
+          valid: false,
+          reason: `Chain structure is malformed. Expected pairs of [data, meta] documents, but found odd count.`,
+          tamperedComponent: 'structure'
+        };
+      } else {
+        const blockReport = verifySingleBlock(blockIndex, currentBlockData, currentDocStr, expectedPrevHash);
+        if (!blockReport.valid) {
+          return blockReport;
+        }
+        blockIndex++;
+      }
+    }
+
+    if (docsCount === 0) {
+      return { valid: false, reason: 'File is completely empty.', tamperedComponent: 'structure' };
+    }
+
+    if (docsCount % 2 !== 0) {
       return {
         valid: false,
-        reason: `Failed to parse metadata document at block ${i} as valid YAML.`,
-        blockIndex: i,
-        tamperedComponent: 'meta'
+        reason: `Chain structure is malformed. Expected pairs of [data, meta] documents, but found ${docsCount} total documents.`,
+        tamperedComponent: 'structure'
       };
     }
-    
-    const meta = parsed?.['$yaml-chain-meta'];
-    if (!meta) {
-      return {
-        valid: false,
-        reason: `Metadata document at block ${i} is missing the '$yaml-chain-meta' root key.`,
-        blockIndex: i,
-        tamperedComponent: 'meta'
-      };
-    }
-    
-    // 1. Verify index
-    if (meta.block_index !== i) {
-      return {
-        valid: false,
-        reason: `Block index mismatch at block ${i}: metadata says index is ${meta.block_index}.`,
-        blockIndex: i,
-        tamperedComponent: 'index',
-        expected: i,
-        actual: meta.block_index
-      };
-    }
-    
-    // 2. Verify previous meta hash
-    if (meta.prev_meta_hash !== expectedPrevHash) {
-      return {
-        valid: false,
-        reason: `Blockchain link broken at block ${i}: expected prev_meta_hash to be '${expectedPrevHash}', but found '${meta.prev_meta_hash}'.`,
-        blockIndex: i,
-        tamperedComponent: 'chain',
-        expected: expectedPrevHash,
-        actual: meta.prev_meta_hash
-      };
-    }
-    
-    // 3. Verify data hash
-    const computedDataHash = sha256(dataDocStr.trim());
-    if (meta.data_hash !== computedDataHash) {
-      return {
-        valid: false,
-        reason: `Cryptographic mismatch in data payload at block ${i}: calculated hash is '${computedDataHash}', but metadata signature has '${meta.data_hash}'.`,
-        blockIndex: i,
-        tamperedComponent: 'data',
-        expected: meta.data_hash,
-        actual: computedDataHash,
-        dataText: dataDocStr
-      };
-    }
-    
-    // 4. Verify meta signature itself
-    const computedMetaHash = deterministicMetaHash(meta);
-    if (meta.meta_hash !== computedMetaHash) {
-      return {
-        valid: false,
-        reason: `Cryptographic mismatch in metadata signature itself at block ${i}: calculated signature is '${computedMetaHash}', but block contains '${meta.meta_hash}'.`,
-        blockIndex: i,
-        tamperedComponent: 'meta',
-        expected: computedMetaHash,
-        actual: meta.meta_hash
-      };
-    }
-    
-    // Set up expectation for next block
-    expectedPrevHash = meta.meta_hash;
+  } catch (err) {
+    fileStream.destroy();
+    throw err;
   }
-  
+
   return { valid: true };
 }
 

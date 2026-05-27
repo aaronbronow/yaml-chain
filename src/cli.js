@@ -109,6 +109,7 @@ export function createCli() {
     .command('verify')
     .argument('<file>', 'Path to the yaml-chain file to verify')
     .option('--diff', 'Show a line-by-line diff of tampered data compared to previous block if possible')
+    .option('-c, --compare-with <known-good-file>', 'Cross-file comparison with a known-good backup file to show the exact changes in the tampered block')
     .description('Cryptographically verify the entire YAML chain integrity')
     .action(async (file, options) => {
       const resolvedPath = path.resolve(file);
@@ -133,10 +134,34 @@ export function createCli() {
           }
           console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
           
-          if (options.diff && report.tamperedComponent === 'data' && report.blockIndex > 0) {
+          if (options.compareWith) {
+            const comparePath = path.resolve(options.compareWith);
+            try {
+              const compareContent = await fs.readFile(comparePath, 'utf8');
+              const compareDocs = splitRawDocuments(compareContent);
+              
+              if (report.tamperedComponent === 'data') {
+                const knownGoodDoc = compareDocs[2 * report.blockIndex];
+                const tamperedDoc = report.dataText;
+                
+                if (knownGoodDoc !== undefined && tamperedDoc !== undefined) {
+                  console.log(`\n🌱 ${colors.bold}Diffing original block (from known-good file) ➡️ tampered block:${colors.reset}`);
+                  console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
+                  const diff = computeDiff(knownGoodDoc, tamperedDoc);
+                  console.log(formatDiffConsole(diff));
+                  console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
+                } else {
+                  console.log(`\n${colors.yellow}Warning: Could not locate Block ${report.blockIndex} in known-good file to diff against.${colors.reset}`);
+                }
+              } else {
+                console.log(`\n${colors.yellow}Comparison file is provided, but failure is in the '${report.tamperedComponent}' component instead of document data.${colors.reset}`);
+              }
+            } catch (err) {
+              console.error(`\n❌ ${colors.red}Error reading known-good comparison file:${colors.reset} ${err.message}`);
+            }
+          } else if (options.diff && report.tamperedComponent === 'data' && report.blockIndex > 0) {
             console.log(`\n${colors.bold}Diffing Block ${report.blockIndex} with previous Block ${report.blockIndex - 1}:${colors.reset}`);
             
-            // Read file again to get previous block content
             const content = await fs.readFile(resolvedPath, 'utf8');
             const docs = splitRawDocuments(content);
             const prevBlockData = docs[2 * (report.blockIndex - 1)];

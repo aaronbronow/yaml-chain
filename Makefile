@@ -2,7 +2,7 @@
 
 SHELL := /bin/bash
 
-.PHONY: all install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys clean
+.PHONY: all install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys test-signatures clean
 
 all: install ys-parser/yaml-chain.ys test
 
@@ -16,11 +16,12 @@ install:
 	@[[ -x /tmp/ys-skill/bin/ys ]] || curl -s https://yamlscript.org/install | PREFIX=/tmp/ys-skill bash
 
 
-test: test-unit test-shared test-cosmetic test-interop
+test: test-unit test-shared test-cosmetic test-interop test-signatures
 	@echo ""
 	@echo "🎉==========================================================="
 	@echo "🎉 ALL TESTS PASSED ACROSS ALL FOUR PARSER IMPLEMENTATIONS!"
 	@echo "🎉==========================================================="
+
 
 test-unit:
 	@echo "🧪 Running unit tests for node-parser..."
@@ -110,9 +111,14 @@ ys-parser/yaml-chain.ys: ys-parser/src/header.ys \
 	@cat $^ >> $@
 	@chmod +x $@
 
+test-signatures: ys-parser/yaml-chain.ys
+	@./tests/generate-mock-keys.sh
+	@./tests/signatures-test.sh
+
 clean:
 	@echo "🧹 Cleaning up temporary test runs..."
-	@rm -rf tests/run ys-parser/yaml-chain.ys
+	@rm -rf tests/run ys-parser/yaml-chain.ys test-fixtures/keys
+
 
 
 

@@ -124,8 +124,8 @@ describe('YAML Chain Engine Tests', () => {
   });
 
   test('should verify the static example files correctly', async () => {
-    const goodPath = path.resolve('./tests/examples/good-chain.yaml');
-    const badPath = path.resolve('./tests/examples/bad-chain.yaml');
+    const goodPath = path.resolve(import.meta.dirname, './examples/good-chain.yaml');
+    const badPath = path.resolve(import.meta.dirname, './examples/bad-chain.yaml');
 
     // 1. Verify good-chain passes
     const goodReport = await verifyChain(goodPath);

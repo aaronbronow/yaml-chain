@@ -1,0 +1,18 @@
+{
+  "name": "yaml-chain-ast",
+  "version": "1.0.0",
+  "description": "Cryptographically secure multi-document YAML block chain (AST-based parser)",
+  "type": "module",
+  "main": "src/chain.js",
+  "bin": {
+    "yaml-chain": "./bin/yaml-chain.js"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "yaml": "^2.4.5"
+  },
+  "private": true
+}

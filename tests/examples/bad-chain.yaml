@@ -1,0 +1,24 @@
+version: 1.0.0
+author: Eve
+---
+$yaml-chain-meta:
+  version: 1.0.0
+  block_index: 0
+  timestamp: 2026-05-27T19:00:27.390Z
+  hashing_strategy: raw
+  data_hash: b4b17978e9fe86d4e647f9f0ac98e0f0112f6e156f3a7f824e9c35dad0eda7e0
+  prev_meta_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+  meta_hash: 7a7f44bcfb9eadba875cef153d2785bb027aaffc9ecf39de5c49231238fd0f66
+---
+version: 1.1.0
+changes:
+  - Improved parsing logic
+---
+$yaml-chain-meta:
+  version: 1.0.0
+  block_index: 1
+  timestamp: 2026-05-27T19:00:27.468Z
+  hashing_strategy: raw
+  data_hash: 7071bb7ea1848540cb9c65c43ca38ddaec0a4c500a0bd41e19526e54f6de0362
+  prev_meta_hash: 7a7f44bcfb9eadba875cef153d2785bb027aaffc9ecf39de5c49231238fd0f66
+  meta_hash: a0b474ae625f9a644762a090e3fa60c2aa7f228c1d9d670585e08e4ac544375c

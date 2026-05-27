@@ -1,0 +1,11 @@
+# Common helper functions and globals
+
+defn compute-meta-hash(version, block-idx, timestamp, hashing-strategy, data-hash, prev-meta-hash):
+  json =: format("{\"block_index\":%d,\"data_hash\":\"%s\",\"hashing_strategy\":\"%s\",\"prev_meta_hash\":\"%s\",\"timestamp\":\"%s\",\"version\":\"%s\"}"
+                 block-idx
+                 data-hash
+                 hashing-strategy
+                 prev-meta-hash
+                 timestamp
+                 version)
+  =>: sha256(json)

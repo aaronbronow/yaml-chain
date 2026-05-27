@@ -1,0 +1,45 @@
+# append command logic
+
+defn append-block(path, data):
+  when-not fs-f(path):
+    die: + "❌ File not found:" + " $path. Run init first."
+  
+  docs =: yaml/load-all(read(path))
+  total-docs =: docs.#
+  
+  when total-docs == 0:
+    die: + "❌ File is empty. Run init first."
+  
+  last-meta-idx =: total-docs - 1
+  last-meta-doc =: docs.(last-meta-idx)
+  last-meta-val =: last-meta-doc.'$yaml-chain-meta'
+  
+  last-index =: last-meta-val.block_index
+  last-meta-hash =: last-meta-val.meta_hash
+  
+  when-not last-meta-hash:
+    die: + "❌ Failed to parse previous metadata block signature."
+  
+  next-index =: last-index + 1
+  clean-data =: trim(data)
+  data-hash =: sha256(clean-data)
+  t =: str(now())
+  timestamp =: "$(subs(t 0 23))Z"
+  meta-hash =: compute-meta-hash("1.0.0" next-index timestamp "raw" data-hash last-meta-hash)
+  
+  existing-content =: read(path)
+  new-content =: |
+    $existing-content$(if existing-content.ends?("\n") "" "\n")---
+    $clean-data
+    ---
+    \$yaml-chain-meta:
+      version: 1.0.0
+      block_index: $next-index
+      timestamp: $timestamp
+      hashing_strategy: raw
+      data_hash: $data-hash
+      prev_meta_hash: $last-meta-hash
+      meta_hash: $meta-hash
+
+  res =: write(path new-content)
+  say: "🔗 Block appended successfully!"

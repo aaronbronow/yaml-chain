@@ -1,0 +1,23 @@
+# init command logic
+
+defn init-chain(path, data):
+  clean-data =: trim(data)
+  data-hash =: sha256(clean-data)
+  t =: str(now())
+  timestamp =: "$(subs(t 0 23))Z"
+  meta-hash =: compute-meta-hash("1.0.0" 0 timestamp "raw" data-hash "0000000000000000000000000000000000000000000000000000000000000000")
+  
+  content =: |
+    $clean-data
+    ---
+    \$yaml-chain-meta:
+      version: 1.0.0
+      block_index: 0
+      timestamp: $timestamp
+      hashing_strategy: raw
+      data_hash: $data-hash
+      prev_meta_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+      meta_hash: $meta-hash
+
+  res =: write(path content)
+  say: + "✨ Success:" + " Initialized YAML chain at $path"

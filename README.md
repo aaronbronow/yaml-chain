@@ -1,81 +1,148 @@
-# yaml-chain
+# Cryptographic YAML Chain PoC
 
-A lightweight, cryptographically secured multi-document YAML block chain proof of concept. It ensures standard multi-document YAML file content cannot be tampered with by forming a secure, hash-linked chain.
+A secure, multi-document cryptographic blockchain proof of concept. This repository explores the trade-offs of different parser architectures by implementing the exact same secure, hash-linked chain rules across **four independent parser implementations**.
 
-## Features
+---
 
-- **Byte-perfect Tamper Detection**: Employs raw-byte SHA-256 signatures to detect literally any change in data, whitespace, comments, or indexing.
-- **Deterministic Metadata Signatures**: Recursively sorts keys in metadata blocks before hashing, ensuring robust chain links.
-- **Interactive Console Diffing**: Custom Longest Common Subsequence (LCS) line diff utility that prints colored terminal comparisons of modified blocks.
-- **Sleek Command Line Interface**: Rich terminal output, visual banners, and detailed validation metrics.
+## 🚀 The Multi-Parser Ecosystem
 
-## Installation
+The core concept is to verify how different programming languages and parser strategies (e.g. raw streams vs. parsed ASTs) handle cryptographic integrity. We implement four parser engines under the same standard linking rules:
 
-```bash
-git clone https://github.com/aaronbronow/yaml-chain.git
-cd yaml-chain
-npm install
+1. **`node-parser/`** (Node.js Stream Engine)
+   - **Strategy**: Constant-memory $O(1)$ stream parser.
+   - **Strictness**: Raw-byte strict. Any modification (including whitespace, formatting, or comments) will fail verification.
+2. **`yaml-parser/`** (Node.js AST Engine)
+   - **Strategy**: Full AST-based parser loading documents into a memory graph.
+   - **Strictness**: Lossy semantic parser. Normalizes documents into pure JSON structures before verification, discarding local formatting and comments.
+3. **`bash-parser/`** (Bash Shell Engine)
+   - **Strategy**: Lightweight Unix CLI utility using standard shell tools (`awk`, `sed`, `sha256sum`).
+   - **Strictness**: Raw-byte strict.
+4. **`ys-parser/`** (YAMLScript/Clojure AST Engine)
+   - **Strategy**: Native Clojure/YAMLScript compiler and JVM environment.
+   - **Strictness**: Lossy semantic parser. Modularized into separate command files in `src/` and assembled on `make`.
+
+---
+
+## 📂 Project Architecture
+
+```text
+/home/aaron/dev/scratch/yaml-chain/
+├── Makefile                    # Multi-parser orchestration & build pipelines
+├── node-parser/                # Core stream-based Node.js parser
+│   ├── bin/yaml-chain.js       # CLI entry point
+│   ├── src/                    # LCS diff verifier logic
+│   └── package.json
+├── yaml-parser/                # AST-based Node.js parser
+│   ├── bin/yaml-chain.js       # CLI entry point
+│   ├── src/                    # AST & JSON normalizer
+│   └── package.json
+├── bash-parser/                # Portable Unix shell implementation
+│   └── yaml-chain.sh           # Executable shell verifier
+├── ys-parser/                  # Modular Clojure-based YAMLScript implementation
+│   ├── yaml-chain.ys           # [GENERATED] Assembled shebang-driven executable
+│   └── src/                    # Modular command source files
+│       ├── header.ys           # Standard hashing logic
+│       ├── init.ys             # init command logic
+│       ├── append.ys           # append command logic
+│       ├── verify.ys           # verify command logic
+│       ├── status.ys           # status command logic
+│       ├── show.ys             # show command logic
+│       └── main.ys             # CLI routing logic
+└── tests/                      # Automated multi-parser test suite
+    ├── shared-tests.sh         # Standardized happy path and tamper tests
+    └── cosmetic-test.sh        # Cosmetic comment divergence validator
 ```
 
-## CLI Usage
+---
 
-### Initialize a New Chain
-Initialize a new YAML chain file with a genesis block:
+## ⚡ The Cosmetic Divergence Proof
+
+This PoC demonstrates a fascinating architectural trade-off: **Raw-byte verification vs. Semantic AST normalization**.
+
+If you inject a harmless comment line (e.g. `# Cosmetic comment`) inside a block's data payload:
+* **Raw-byte verifiers (`node-parser`, `bash-parser`)**: Hash the literal bytes. The comment modifies the raw byte sequence, so **verification fails**.
+* **Semantic AST verifiers (`yaml-parser`, `ys-parser`)**: Parse the YAML into object representations (AST). Comments are discarded during parsing. Re-serialization produces clean data matching the original signature, so **verification passes**.
+
+You can run this validation proof automatically:
 ```bash
-node bin/yaml-chain.js init example.yaml -d "version: 1.0.0
-author: Aaron"
+make test-cosmetic
 ```
 
-### Append a Block
-Append a new document block:
+---
+
+## 💻 CLI Usage
+
+All four parsers support the exact same command line interface. Simply swap out the executable:
+* `node-parser`: `./node-parser/bin/yaml-chain.js`
+* `yaml-parser`: `./yaml-parser/bin/yaml-chain.js`
+* `bash-parser`: `./bash-parser/yaml-chain.sh`
+* `ys-parser`: `./ys-parser/yaml-chain.ys`
+
+### 1. Initialize a Chain
 ```bash
-node bin/yaml-chain.js append example.yaml -d "version: 1.1.0
-changes:
-  - Added new features"
+./ys-parser/yaml-chain.ys init chain.yaml -d $'author: Aaron\nrole: Initiator'
 ```
 
-### Verify Chain Integrity
-Verify that the entire chain is cryptographically intact and has not been modified:
+### 2. Append a Block
 ```bash
-node bin/yaml-chain.js verify example.yaml
+./ys-parser/yaml-chain.ys append chain.yaml -d $'author: Bob\nrole: Receiver'
 ```
 
-If the file is tampered, the CLI instantly reports the exact tampered block index and component (e.g. data or meta). You can also run with `--diff` to see how it compares to the previous block:
+### 3. Verify Chain Integrity
 ```bash
-node bin/yaml-chain.js verify example.yaml --diff
+./ys-parser/yaml-chain.ys verify chain.yaml
 ```
 
-#### ⚡ Command Shortcuts (md5sum-style)
-The CLI has built-in intelligent routing that lets you verify files directly without subcommands:
-- **Standard Verification**: `node bin/yaml-chain.js example.yaml` (automatically routes to `verify example.yaml`)
-- **Cross-File Verification**: `node bin/yaml-chain.js test-bad.yaml test-good.yaml` (automatically routes to `verify test-bad.yaml -c test-good.yaml` to show original vs tampered diff)
-
-
-### View Status & Metadata
-Display block counts, file health, and latest block metrics:
+#### ⚡ Command-less Verification Shortcut (md5sum-style)
 ```bash
-node bin/yaml-chain.js status example.yaml
+# Verify standard file
+./ys-parser/yaml-chain.ys chain.yaml
+
+# Compare good vs bad (with visual diffing)
+./ys-parser/yaml-chain.ys tampered.yaml chain.yaml
 ```
 
-### Show Block Payload
-Display the raw payload of a specific block:
+### 4. Display Health Status
 ```bash
-node bin/yaml-chain.js show example.yaml 0
+./ys-parser/yaml-chain.ys status chain.yaml
 ```
 
-### Diff Any Two Blocks
-Compare any two data blocks inside the chain:
+### 5. Show Raw Payload
 ```bash
-node bin/yaml-chain.js diff example.yaml --block-a 0 --block-b 1
+./ys-parser/yaml-chain.ys show chain.yaml 1
 ```
 
-## Running Tests
+---
 
-Execute the Node.js native test suite:
+## 🧪 Testing Orchestration
+
+The master `Makefile` coordinates dependency installation, engine builds, and tests across all four parsers:
+
+### Install all dependencies and setup local `ys` engine:
 ```bash
-npm test
+make install
 ```
 
-## License
+### Run the entire testing suite (unit, shared-integration, cosmetic, and cross-interoperability tests):
+```bash
+make test
+```
+
+### Run isolated test targets for a single parser:
+```bash
+make test-node    # Run node-parser tests only
+make test-yaml    # Run yaml-parser tests only
+make test-bash    # Run bash-parser tests only
+make test-ys      # Run ys-parser tests only
+```
+
+### Clean up test runs and assembled executables:
+```bash
+make clean
+```
+
+---
+
+## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).

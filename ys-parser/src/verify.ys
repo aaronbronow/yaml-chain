@@ -1,0 +1,96 @@
+# verify command logic
+
+defn verify-chain(path, compare-path=''):
+  when-not fs-f(path):
+    die: + "❌ File not found:" + " $path"
+  
+  docs =: yaml/load-all(read(path))
+  total-docs =: docs.#
+  
+  when total-docs == 0:
+    die: + "❌ File is completely empty."
+  
+  when-not rem(total-docs 2) == 0:
+    die: + "❌ Chain structure is malformed. Expected pairs of [data, meta] documents, but found $total-docs total documents."
+  
+  block-count =: total-docs / 2
+  expected-prev-hash =: "0000000000000000000000000000000000000000000000000000000000000000"
+  
+  loop i 0, current-prev-hash expected-prev-hash:
+    when i < block-count:
+      data-idx =: 2 * i
+      meta-idx =: data-idx + 1
+      
+      data-doc =: docs.(data-idx)
+      meta-doc =: docs.(meta-idx)
+      meta-val =: meta-doc.'$yaml-chain-meta'
+      
+      when-not meta-val:
+        say: "❌ VERIFICATION FAILED! TAMPER DETECTED!"
+        say: + "Reason:" + "        Metadata block is missing or malformed at block $i."
+        say: "Failed Block:  Block $i"
+        say: "Component:     meta"
+        exit: 1
+      
+      meta-block-index =: meta-val.block_index
+      meta-version =: meta-val.version
+      meta-timestamp =: str(instant(meta-val.timestamp))
+      meta-hashing-strategy =: meta-val.hashing_strategy
+      meta-data-hash =: meta-val.data_hash
+      meta-prev-meta-hash =: meta-val.prev_meta_hash
+      meta-hash-val =: meta-val.meta_hash
+      
+      when-not meta-block-index == i:
+        say: "❌ VERIFICATION FAILED! TAMPER DETECTED!"
+        say: + "Reason:" + "        Block index mismatch at block $i" + ":" + " metadata says index is $meta-block-index."
+        say: "Failed Block:  Block $i"
+        say: "Component:     index"
+        exit: 1
+        
+      when-not meta-prev-meta-hash == current-prev-hash:
+        say: "❌ VERIFICATION FAILED! TAMPER DETECTED!"
+        say: + "Reason:" + "        Blockchain link broken at block $i" + ":" + " expected prev_meta_hash to be '$current-prev-hash', but found '$meta-prev-meta-hash'."
+        say: "Failed Block:  Block $i"
+        say: "Component:     chain"
+        exit: 1
+        
+      computed-data-hash =: sha256(yaml/dump(data-doc).trim())
+      
+      when-not meta-data-hash == computed-data-hash:
+        say: "❌ VERIFICATION FAILED! TAMPER DETECTED!"
+        say: + "Reason:" + "        Cryptographic mismatch in data payload at block $i."
+        say: "Failed Block:  Block $i"
+        say: "Component:     data"
+        say: + "Expected:" + "      $meta-data-hash"
+        say: + "Actual:" + "        $computed-data-hash"
+        
+        when-not compare-path == "":
+          when fs-f(compare-path):
+            comp-docs =: yaml/load-all(read(compare-path))
+            when (comp-docs.# > data-idx):
+              good-doc =: comp-docs.(data-idx)
+              say: ""
+              say: + "🌱 Diffing original block (from known-good file) ➡️ tampered block" + ":"
+              say: "------------------------------------------------------------"
+              say: + "- Original" + ":"
+              say: yaml/dump(good-doc).trim()
+              say: + "+ Tampered" + ":"
+              say: yaml/dump(data-doc).trim()
+              say: "------------------------------------------------------------"
+        exit: 1
+        
+      computed-meta-hash =: compute-meta-hash(meta-version meta-block-index meta-timestamp meta-hashing-strategy meta-data-hash meta-prev-meta-hash)
+      
+      when-not meta-hash-val == computed-meta-hash:
+        say: "❌ VERIFICATION FAILED! TAMPER DETECTED!"
+        say: + "Reason:" + "        Cryptographic mismatch in metadata signature itself at block $i" + ":" + " calculated signature is '$computed-meta-hash', but block contains '$meta-hash-val'."
+        say: "Failed Block:  Block $i"
+        say: "Component:     meta"
+        exit: 1
+        
+      recur:
+        i.++
+        meta-hash-val
+        
+  say: + "✅ VERIFICATION PASSED:" + " The YAML chain is complete, cryptographically intact, and untampered."
+  exit: 0

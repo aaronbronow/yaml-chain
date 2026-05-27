@@ -63,7 +63,17 @@ else
   exit 1
 fi
 
+# 6. Verify on ys-parser (AST-based verifier) -> Expected PASS!
+echo -ne "  [ys-parser] (AST-based verifier)       ... "
+if ./ys-parser/yaml-chain.ys verify "$run_dir/cosmetic-bad.yaml" > /dev/null 2>&1; then
+  echo -e "${colors_green}PASSED AS EXPECTED (Tamper Ignored/Normalized!)${colors_reset}"
+else
+  echo -e "${colors_red}FAILED UNEXPECTEDLY (Failed to normalize!)${colors_reset}"
+  exit 1
+fi
+
 echo -e "\n${colors_bold}${colors_green}🌟 Cosmetic divergence proof test completed successfully!${colors_reset}"
 echo -e "Proof Conclusion:"
 echo -e "  - Raw-byte verifiers (node & bash) detect ANY modification, including formatting/comments."
-echo -e "  - AST-based verifier (yaml) normalizes the document through parsed objects, losing local comments."
+echo -e "  - AST-based verifiers (yaml & ys) normalize the document through parsed objects, losing local comments."
+

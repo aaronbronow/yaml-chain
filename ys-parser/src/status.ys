@@ -1,0 +1,33 @@
+# status command logic
+
+defn status-chain(path):
+  when-not fs-f(path):
+    die: + "❌ File not found:" + " $path"
+    
+  docs =: yaml/load-all(read(path))
+  total-docs =: docs.#
+  block-count =: total-docs / 2
+  is-healthy =: rem(total-docs 2) == 0
+  
+  say: + "📊 YAML Chain Status:" + " $path"
+  say: "------------------------------------------------------------"
+  if is-healthy:
+    say: + "File Health:" + "    Healthy"
+    say: + "File Health:" + "    Malformed"
+    
+  say: + "Block Count:" + "    $block-count"
+  
+  when is-healthy && (block-count > 0):
+    last-meta-idx =: total-docs - 1
+    last-meta-doc =: docs.(last-meta-idx)
+    last-meta-val =: last-meta-doc.'$yaml-chain-meta'
+    
+    last-index =: last-meta-val.block_index
+    last-timestamp =: str(instant(last-meta-val.timestamp))
+    last-meta-hash =: last-meta-val.meta_hash
+    
+    say: + "Last Block No:" + "  $last-index"
+    say: + "Last Timestamp:" + " $last-timestamp"
+    say: + "Last Hash:" + "      $last-meta-hash"
+    
+  say: "------------------------------------------------------------"

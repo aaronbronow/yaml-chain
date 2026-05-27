@@ -1,0 +1,7 @@
+# show command logic
+
+defn show-block(path, index):
+  docs =: yaml/load-all(read(path))
+  data-idx =: 2 * index
+  data-doc =: docs.(data-idx)
+  say: yaml/dump(data-doc).trim()

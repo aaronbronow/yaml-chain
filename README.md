@@ -12,7 +12,7 @@ A lightweight, cryptographically secured multi-document YAML block chain proof o
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/yaml-chain.git
+git clone https://github.com/aaronbronow/yaml-chain.git
 cd yaml-chain
 npm install
 ```

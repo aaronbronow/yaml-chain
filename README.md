@@ -113,8 +113,47 @@ make test-ys      # Run ys-parser tests only
 make clean
 ```
 
+## 📝 Schema Questions
+
+This section proposes a production-grade, extended schema layout for software supply chain/SBOM implementations. It showcases how to embed git state context, delta transaction logs, and external document pointers directly inside the chain.
+
+*(Note: The actual PoC verifiers in this codebase use the streamlined keys defined in `$yaml-chain-meta` to maintain $O(1)$ stream parser performance. The layout below serves as a blueprint for production design discussions).*
+
+```yaml
+---
+$yaml-chain-meta:
+  block_index: integer        # Must be exact increment of previous block_index
+  timestamp: string          # ISO 8601 UTC format
+  prev_meta_hash: string     # SHA-256 of the previous block's complete metadata block
+  payload_hash: string       # SHA-256 of the raw payload string below
+  meta_hash: string          # SHA-256 of this metadata block (excluding this key)
+payload:
+  schema_version: string     # Schema version of this PoC (e.g., "1.0.0")
+  event_type: string         # [baseline | delta | pointer]
+  
+  # Git Context (The Identity/State Anchors)
+  git_ref:
+    commit_sha: string       # The exact Git commit that triggered this block
+    branch: string           # The context branch (e.g., "refs/heads/main")
+  
+  # The Data (Mutually exclusive based on event_type)
+  data:
+    # Option A: The Pointer (Best for massive monolithic SBOMs)
+    external_target:
+      path: string           # e.g., "outputs/bom.cyclonedx.json"
+      sha256: string         # The exact hash of that file at this commit
+    
+    # Option B: The Transactional Delta (Best for continuous PR lockfile updates)
+    package_delta:
+      manager: string        # e.g., "npm", "cargo", "pip"
+      added: [ array ]       # List of new packages + versions
+      removed: [ array ]     # List of removed packages
+      updated: [ array ]     # List of components that changed versions
+```
+
 ---
 
 ## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
+

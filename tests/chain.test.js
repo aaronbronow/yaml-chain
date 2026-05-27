@@ -122,4 +122,19 @@ describe('YAML Chain Engine Tests', () => {
     assert.strictEqual(report.blockIndex, 1);
     assert.strictEqual(report.tamperedComponent, 'chain');
   });
+
+  test('should verify the static example files correctly', async () => {
+    const goodPath = path.resolve('./tests/examples/good-chain.yaml');
+    const badPath = path.resolve('./tests/examples/bad-chain.yaml');
+
+    // 1. Verify good-chain passes
+    const goodReport = await verifyChain(goodPath);
+    assert.strictEqual(goodReport.valid, true);
+
+    // 2. Verify bad-chain fails on block 0 data payload
+    const badReport = await verifyChain(badPath);
+    assert.strictEqual(badReport.valid, false);
+    assert.strictEqual(badReport.blockIndex, 0);
+    assert.strictEqual(badReport.tamperedComponent, 'data');
+  });
 });

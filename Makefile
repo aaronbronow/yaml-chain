@@ -2,9 +2,15 @@
 
 SHELL := /bin/bash
 
-.PHONY: all install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys test-signatures clean
+.PHONY: all build release-notes install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys test-signatures clean
 
-all: install ys-parser/yaml-chain.ys test
+all: build test
+
+build: install ys-parser/yaml-chain.ys
+
+release-notes: build
+	@echo "📝 Generating release notes from example.yaml..."
+	@node node-parser/bin/yaml-chain.js changelog example.yaml -o RELEASE_NOTES.md
 
 install:
 	@echo "📦 Installing node-parser dependencies..."

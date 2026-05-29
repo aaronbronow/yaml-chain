@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createCli } from '../src/cli.js';
 
-const knownCommands = new Set(['init', 'append', 'verify', 'status', 'diff', 'show', 'help', '-h', '--help', '-V', '--version']);
+const knownCommands = new Set(['init', 'append', 'verify', 'status', 'diff', 'show', 'changelog', 'verify-asset', 'help', '-h', '--help', '-V', '--version']);
 const args = process.argv.slice(2);
 const firstArg = args[0];
 

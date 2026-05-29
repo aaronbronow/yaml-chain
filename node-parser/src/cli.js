@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { initChain, appendBlock, verifyChain, getChainStatus, splitRawDocuments } from './chain.js';
+import { initChain, appendBlock, verifyChain, getChainStatus, splitRawDocuments, generateReleaseNotes, verifyAsset } from './chain.js';
 import { computeDiff, formatDiffConsole } from './diff.js';
 
 const colors = {
@@ -270,6 +270,52 @@ export function createCli() {
         console.log(data);
       } catch (err) {
         console.error(`\n❌ ${colors.red}${colors.bold}Error printing block data:${colors.reset} ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('changelog')
+    .argument('<file>', 'Path to the yaml-chain file')
+    .option('-o, --output <output-file>', 'Save changelog/release notes to a markdown file')
+    .description('Generate structured markdown release notes / changelog from the YAML chain')
+    .action(async (file, options) => {
+      const resolvedPath = path.resolve(file);
+      try {
+        const markdown = await generateReleaseNotes(resolvedPath);
+        if (options.output) {
+          const resolvedOut = path.resolve(options.output);
+          await fs.writeFile(resolvedOut, markdown, 'utf8');
+          console.log(`\n📝 ${colors.green}${colors.bold}Changelog generated successfully!${colors.reset} Saved to: ${options.output}`);
+        } else {
+          console.log(markdown);
+        }
+      } catch (err) {
+        console.error(`\n❌ ${colors.red}${colors.bold}Error generating changelog:${colors.reset} ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('verify-asset')
+    .argument('<file>', 'Path to the yaml-chain file')
+    .argument('<asset>', 'Path to the local build asset to verify')
+    .description('Verify if a local build asset matches the cryptographically secured build attestation in the chain')
+    .action(async (file, asset) => {
+      const resolvedChain = path.resolve(file);
+      const resolvedAsset = path.resolve(asset);
+      console.log(`🔍 ${colors.bold}Verifying build attestation for asset:${colors.reset} ${path.basename(asset)} ...`);
+      try {
+        const report = await verifyAsset(resolvedChain, resolvedAsset);
+        console.log(`\n✅ ${colors.green}${colors.bold}ATTESTATION PASSED:${colors.reset}`);
+        console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
+        console.log(`${colors.bold}Asset Name:${colors.reset}   ${report.assetName}`);
+        console.log(`${colors.bold}Chain Block:${colors.reset}  Block ${report.blockIndex}`);
+        console.log(`${colors.bold}Builder:${colors.reset}      ${report.builder || 'Unknown'}`);
+        console.log(`${colors.bold}Asset Hash:${colors.reset}   ${colors.yellow}${report.actualHash}${colors.reset}`);
+        console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
+      } catch (err) {
+        console.error(`\n❌ ${colors.red}${colors.bold}ATTESTATION FAILED:${colors.reset} ${err.message}`);
         process.exit(1);
       }
     });

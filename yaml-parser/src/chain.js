@@ -241,3 +241,177 @@ export async function getChainStatus(filepath) {
     lastBlock
   };
 }
+
+/**
+ * Generates structured release notes / changelog from the YAML chain.
+ * @param {string} filepath
+ * @returns {Promise<string>} Markdown formatted release notes
+ */
+export async function generateReleaseNotes(filepath) {
+  const fileContent = await fs.readFile(filepath, 'utf8');
+  const docs = splitRawDocuments(fileContent);
+  if (docs.length === 0) {
+    throw new Error('Chain is empty.');
+  }
+  
+  if (docs.length % 2 !== 0) {
+    throw new Error('Chain structure is malformed (odd number of documents).');
+  }
+  
+  const blockCount = docs.length / 2;
+  let markdown = '# SBOM & Software Release Changelog\n\n';
+  markdown += `Generated on: ${new Date().toISOString()}\n\n`;
+  markdown += `Total Blocks: ${blockCount}\n\n`;
+  markdown += `---\n\n`;
+  
+  // We want to list blocks in reverse chronological order (latest first)
+  for (let i = blockCount - 1; i >= 0; i--) {
+    const dataDocStr = docs[2 * i];
+    const metaDocStr = docs[2 * i + 1];
+    
+    const parsedData = YAML.parse(dataDocStr);
+    const parsedMeta = YAML.parse(metaDocStr)?.['$yaml-chain-meta'];
+    
+    if (!parsedMeta) {
+      continue;
+    }
+    
+    const version = parsedData?.version || parsedData?.versionInfo || parsedData?.['version'] || null;
+    const author = parsedData?.author || parsedMeta?.author || 'Unknown';
+    const timestamp = parsedMeta.timestamp;
+    const blockIndex = parsedMeta.block_index;
+    const metaHash = parsedMeta.meta_hash;
+    
+    if (version) {
+      markdown += `## [${version}] - ${timestamp}\n\n`;
+    } else if (parsedData?.build_attestation) {
+      markdown += `## [Build Attestation] - Block ${blockIndex} - ${timestamp}\n\n`;
+    } else {
+      markdown += `## Block ${blockIndex} - ${timestamp}\n\n`;
+    }
+    
+    markdown += `- **Author:** ${author}\n`;
+    markdown += `- **Block Index:** ${blockIndex}\n`;
+    markdown += `- **Block Hash:** \`${metaHash}\`\n`;
+    
+    // Process changes
+    if (parsedData?.changes) {
+      markdown += `- **Changes:**\n`;
+      if (Array.isArray(parsedData.changes)) {
+        for (const change of parsedData.changes) {
+          markdown += `  - ${change}\n`;
+        }
+      } else {
+        markdown += `  - ${parsedData.changes}\n`;
+      }
+    } else if (parsedData?.comment) {
+      markdown += `- **Comment:** ${parsedData.comment}\n`;
+    } else if (parsedData?.description) {
+      markdown += `- **Description:** ${parsedData.description}\n`;
+    }
+    
+    // Process build attestation details
+    if (parsedData?.build_attestation) {
+      const att = parsedData.build_attestation;
+      markdown += `- **Build Attestation Details:**\n`;
+      markdown += `  - **Asset Name:** \`${att.asset_name}\`\n`;
+      markdown += `  - **Asset Hash (SHA-256):** \`${att.asset_hash}\`\n`;
+      markdown += `  - **Builder:** ${att.builder || 'Unknown'}\n`;
+    }
+    
+    // Process vulnerabilities (CycloneDX style VEX)
+    if (parsedData?.vulnerabilities && Array.isArray(parsedData.vulnerabilities)) {
+      markdown += `- **Vulnerability Analysis (VEX):**\n`;
+      for (const vuln of parsedData.vulnerabilities) {
+        markdown += `  - **ID:** \`${vuln.id}\` (${vuln.analysis?.state || 'unknown'})\n`;
+        if (vuln.description) {
+          markdown += `    - *Description:* ${vuln.description}\n`;
+        }
+        if (vuln.analysis?.detail) {
+          markdown += `    - *Detail:* ${vuln.analysis.detail}\n`;
+        }
+      }
+    }
+    
+    // Process packages (SPDX style)
+    if (parsedData?.packages && Array.isArray(parsedData.packages)) {
+      markdown += `- **Software Package Updates:**\n`;
+      for (const pkg of parsedData.packages) {
+        const pkgName = pkg.name || pkg.SPDXID || 'Unnamed Package';
+        const pkgVer = pkg.versionInfo || pkg.version || 'unknown';
+        const pkgLicense = pkg.concludedLicense || pkg.licenseConcluded || '';
+        markdown += `  - \`${pkgName}\` (v${pkgVer}) ${pkgLicense ? `- License: *${pkgLicense}*` : ''}\n`;
+      }
+    }
+    
+    markdown += `\n---\n\n`;
+  }
+  
+  return markdown.trim();
+}
+
+/**
+ * Verifies if a given local asset matches any build attestation in the YAML chain.
+ * @param {string} chainFile
+ * @param {string} assetFile
+ * @returns {Promise<object>} Attestation verification metadata
+ */
+export async function verifyAsset(chainFile, assetFile) {
+  // First, verify the chain integrity
+  const report = await verifyChain(chainFile);
+  if (!report.valid) {
+    throw new Error(`Chain verification failed: ${report.reason}`);
+  }
+  
+  // Read the asset and compute SHA-256
+  let assetContent;
+  try {
+    assetContent = await fs.readFile(assetFile);
+  } catch (err) {
+    throw new Error(`Could not read asset file '${assetFile}': ${err.message}`);
+  }
+  const assetHash = sha256(assetContent);
+  const assetName = path.basename(assetFile);
+  
+  // Search the chain for build attestations
+  const fileContent = await fs.readFile(chainFile, 'utf8');
+  const docs = splitRawDocuments(fileContent);
+  const blockCount = docs.length / 2;
+  
+  let foundAttestation = null;
+  let foundIndex = -1;
+  
+  for (let i = 0; i < blockCount; i++) {
+    const dataDocStr = docs[2 * i];
+    const parsedData = YAML.parse(dataDocStr);
+    
+    if (parsedData?.build_attestation) {
+      const att = parsedData.build_attestation;
+      const attName = att.asset_name;
+      // Match by exact name or basename
+      if (attName === assetName || path.basename(attName) === assetName) {
+        foundAttestation = att;
+        foundIndex = i;
+        break;
+      }
+    }
+  }
+  
+  if (!foundAttestation) {
+    throw new Error(`No build attestation block found in the chain for asset '${assetName}'.`);
+  }
+  
+  if (foundAttestation.asset_hash !== assetHash) {
+    throw new Error(`Asset hash mismatch! Expected '${foundAttestation.asset_hash}', but computed '${assetHash}'.`);
+  }
+  
+  return {
+    valid: true,
+    blockIndex: foundIndex,
+    assetName,
+    expectedHash: foundAttestation.asset_hash,
+    actualHash: assetHash,
+    builder: foundAttestation.builder
+  };
+}
+

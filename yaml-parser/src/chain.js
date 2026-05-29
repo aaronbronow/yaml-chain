@@ -245,9 +245,10 @@ export async function getChainStatus(filepath) {
 /**
  * Generates structured release notes / changelog from the YAML chain.
  * @param {string} filepath
+ * @param {string} owner - GitHub repository owner
  * @returns {Promise<string>} Markdown formatted release notes
  */
-export async function generateReleaseNotes(filepath) {
+export async function generateReleaseNotes(filepath, owner = 'aaronbronow') {
   const fileContent = await fs.readFile(filepath, 'utf8');
   const docs = splitRawDocuments(fileContent);
   if (docs.length === 0) {
@@ -342,6 +343,17 @@ export async function generateReleaseNotes(filepath) {
         const pkgLicense = pkg.concludedLicense || pkg.licenseConcluded || '';
         markdown += `  - \`${pkgName}\` (v${pkgVer}) ${pkgLicense ? `- License: *${pkgLicense}*` : ''}\n`;
       }
+    }
+    
+    if (version || parsedData?.build_attestation) {
+      markdown += `\n### 🛡️ Cryptographic Artifact Verification\n`;
+      markdown += `To verify build provenance using GitHub's Artifact Attestations, run:\n`;
+      markdown += `\`\`\`bash\n`;
+      markdown += `# Verify the compiled binary provenance\n`;
+      markdown += `gh attestation verify yaml-chain-bin.tar.gz --owner ${owner}\n\n`;
+      markdown += `# Verify the secure SBOM ledger provenance\n`;
+      markdown += `gh attestation verify chain.yaml --owner ${owner}\n`;
+      markdown += `\`\`\`\n`;
     }
     
     markdown += `\n---\n\n`;

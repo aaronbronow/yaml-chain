@@ -278,11 +278,12 @@ export function createCli() {
     .command('changelog')
     .argument('<file>', 'Path to the yaml-chain file')
     .option('-o, --output <output-file>', 'Save changelog/release notes to a markdown file')
+    .option('-w, --owner <owner>', 'Specify GitHub repository owner for attestation verification commands', 'aaronbronow')
     .description('Generate structured markdown release notes / changelog from the YAML chain')
     .action(async (file, options) => {
       const resolvedPath = path.resolve(file);
       try {
-        const markdown = await generateReleaseNotes(resolvedPath);
+        const markdown = await generateReleaseNotes(resolvedPath, options.owner);
         if (options.output) {
           const resolvedOut = path.resolve(options.output);
           await fs.writeFile(resolvedOut, markdown, 'utf8');

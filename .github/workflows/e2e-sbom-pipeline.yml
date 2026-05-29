@@ -12,7 +12,8 @@ on:
 permissions:
   contents: read
   id-token: write
-  packages: write  # Required to publish secure ledger OCI packages to GHCR
+  packages: write      # Required to publish secure ledger OCI packages to GHCR
+  attestations: write  # Required to generate artifact attestations using Sigstore
 
 jobs:
   run-validation-suites:
@@ -89,7 +90,7 @@ jobs:
 
       - name: "Generate SBOM Release Notes Changelog"
         run: |
-          node node-parser/bin/yaml-chain.js changelog chain.yaml -o RELEASE_NOTES.md
+          node node-parser/bin/yaml-chain.js changelog chain.yaml -o RELEASE_NOTES.md --owner ${{ github.repository_owner }}
           cat RELEASE_NOTES.md
 
       - name: "Log in to GitHub Container Registry"
@@ -112,6 +113,16 @@ jobs:
           IMAGE_TAG="ghcr.io/${{ github.repository }}/yaml-chain-ledger:latest"
           docker build -t $IMAGE_TAG -f Dockerfile.artifact .
           docker push $IMAGE_TAG
+
+      - name: "Generate GitHub Artifact Attestation for Compiled Binary"
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/yaml-chain-bin.tar.gz"
+
+      - name: "Generate GitHub Artifact Attestation for secure SBOM Ledger"
+        uses: actions/attest@v4
+        with:
+          subject-path: "chain.yaml"
 
       - name: "Enforce Security Attestation Gate (Verify Untampered)"
         run: |

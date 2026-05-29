@@ -1,5 +1,9 @@
 # show command logic
 
+!ys-0
+
+ns: show
+
 defn show-block(path, index):
   docs =: yaml/load-all(read(path))
   data-idx =: 2 * index

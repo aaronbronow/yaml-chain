@@ -1,5 +1,11 @@
 # append command logic
 
+!ys-0
+
+ns: append
+
+load: './header.ys'
+
 defn append-block(path, data):
   when-not fs-f(path):
     die: + "❌ File not found:" + " $path. Run init first."

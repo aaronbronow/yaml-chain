@@ -1,0 +1,10 @@
+item: Genesis
+---
+$yaml-chain-meta:
+  version: 1.0.0
+  block_index: 0
+  timestamp: 2026-05-29T20:39:12.097Z
+  hashing_strategy: raw
+  data_hash: 4c7801f10464f9e8f60bb9146f92313e29e159955ae7f7d789d84c2591b24894
+  prev_meta_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+  meta_hash: 4d85a81a8b49515b8ee30d8d9340a13825edee71174f2af91cdf6de36969b400

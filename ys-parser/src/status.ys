@@ -1,5 +1,9 @@
 # status command logic
 
+!ys-0
+
+ns: status
+
 defn status-chain(path):
   when-not fs-f(path):
     die: + "❌ File not found:" + " $path"

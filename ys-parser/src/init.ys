@@ -1,5 +1,11 @@
 # init command logic
 
+!ys-0
+
+ns: init
+
+load: './header.ys'
+
 defn init-chain(path, data):
   clean-data =: trim(data)
   data-hash =: sha256(clean-data)

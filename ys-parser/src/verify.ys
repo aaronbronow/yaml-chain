@@ -1,5 +1,11 @@
 # verify command logic
 
+!ys-0
+
+ns: verify
+
+load: './header.ys'
+
 defn verify-chain(path, compare-path=''):
   when-not fs-f(path):
     die: + "❌ File not found:" + " $path"

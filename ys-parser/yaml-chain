@@ -1,0 +1,50 @@
+#!/usr/bin/env ys-0
+
+# CLI command routing and main entry point
+
+use:
+  verify:
+  init:
+  append:
+  status:
+  show:
+
+defn main(*args):
+  cmd arg1 arg2 arg3 =: ARGV
+  known-cmds =: qw(init append verify status show)
+  args =: ARGV.#
+  
+  cond:
+    args.!:
+      do:
+        say: 'Usage: yaml-chain.ys [command] [args]'
+        exit: 1
+      
+    args.? && fs-f(cmd) && cmd.in?(known-cmds).!:
+      if arg2 == 2:
+        verify-chain: cmd arg1
+        verify-chain: cmd
+        
+    cmd == 'init':
+      if args == 4:
+        init-chain: arg1 arg3
+        die: 'Usage: yaml-chain.ys init <file> -d <yaml-string>'
+      
+    cmd == 'append':
+      if args == 4:
+        append-block: arg1 arg3
+        die: 'Usage: yaml-chain.ys append <file> -d <yaml-string>'
+      
+    cmd == 'verify':
+      if args == 4:
+        verify-chain: arg1 arg3
+        verify-chain: arg1
+        
+    cmd == 'status':
+      status-chain: arg1
+      
+    cmd == 'show':
+      show-block: arg1 arg2:N
+      
+    else:
+      die: "Unknown command: $cmd"

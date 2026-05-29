@@ -101,3 +101,58 @@ For most supply chain security audits, **Pattern 1 (Detached Signed Manifest) is
    - Run the verification script against `chain.sig.yaml`.
    - The script will compute the actual tail of `chain.yaml`, see that it matches the manifest's `meta_hash`, but as it walks backward, it will hit **Eve's** tampered block and fail.
    - If **Eve** tries to rewrite `chain.sig.yaml` to match her new fake hashes, she won't be able to generate a valid Git signature matching **Aaron** or **Bob's** GPG/SSH keys, and the CI/CD pipeline will reject the commit entirely.
+
+---
+
+## 🏁 Developer Release Lifecycle: When & How to Sign
+
+In a production secure software supply chain, a developer signs their work at **two critical checkpoints** on their local workstation before pushing code to the remote repository. This establishes a verified, cryptographically sealed path from the developer's keyboard all the way to the published release.
+
+### Step-by-Step Signing Sequence
+
+```mermaid
+sequenceDiagram
+    actor Developer
+    participant Git as Local Git
+    participant Remote as GitHub Remote
+    participant Runner as Actions Runner
+    Developer->>Git: 1. Code & Ledger Finalized
+    Developer->>Git: 2. git commit -S (Signs Commit)
+    Developer->>Git: 3. git tag -s (Signs Release Tag)
+    Developer->>Remote: 4. git push (Uploads Signed Work)
+    Remote->>Runner: 5. Tag Push Triggers Workflow
+    Runner->>Runner: 6. Verifies Signatures & Attests Release
+```
+
+#### 1. Signing the Release Commit (Local Commit)
+* **When:** Right after finalizing code changes, updating version numbers, or sealing the cryptographic ledger (`chain.yaml`) locally.
+* **How:** Add the `-S` flag to sign the commit using your local GPG, SSH, or S/MIME private key:
+  ```bash
+  git commit -S -m "chore(release): bump version to v1.2.0 and seal ledger"
+  ```
+* **Why:** This cryptographically anchors your verified identity to the commit payload, proving that the final code state was authorized by you before leaving your machine.
+
+#### 2. Signing the Release Tag (Local Tagging)
+* **When:** Immediately after recording the release commit, right before pushing.
+* **How:** Create a signed Git tag using the `-s` flag:
+  ```bash
+  git tag -s v1.2.0 -m "Release v1.2.0"
+  ```
+* **Why:** In Git, a signed tag creates an independent, immutable cryptographic tag object containing your signature pointing directly to the commit SHA. This acts as the official, tamper-proof seal of approval for the release.
+
+#### 3. Pushing to GitHub (The Hand-off)
+* **When:** Once the commit and tag are securely signed.
+* **How:** Push both the branch and the new tag to trigger the pipeline:
+  ```bash
+  git push origin main
+  git push origin v1.2.0
+  ```
+
+### How the CI/CD Pipeline Validates and Seals Your Release
+
+When you push the signed tag `v*` to GitHub:
+1. **Developer Signature Gate:** The runner verifies the GPG/SSH signatures on the commit and tag against a trusted keyring (which our `test-signatures` integration suite simulates).
+2. **Natively Compiles Binary:** The runner compiles the code and archives it into `yaml-chain-bin.tar.gz`.
+3. **Mints Sigstore Attestation:** The runner uses `actions/attest@v4` to mint an unfalsifiable build provenance attestation for the binary and `chain.yaml` (publishing the metadata signature directly to Sigstore's Rekor transparency log).
+4. **Publishes Release:** The runner publishes the assets and ledger to GitHub Releases, closing the loop on an entirely verified, cryptographically secured software supply chain.
+

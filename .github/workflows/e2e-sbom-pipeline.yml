@@ -153,8 +153,9 @@ jobs:
 
       - name: "Simulate Tamper Attack & Verify Gate Rejection"
         run: |
-          echo "## EVIL TAMPER ##" >> dist/yaml-chain-bin.tar.gz
-          if node node-parser/bin/yaml-chain.js verify-asset chain.yaml dist/yaml-chain-bin.tar.gz; then
+          cp dist/yaml-chain-bin.tar.gz dist/yaml-chain-bin-tampered.tar.gz
+          echo "## EVIL TAMPER ##" >> dist/yaml-chain-bin-tampered.tar.gz
+          if node node-parser/bin/yaml-chain.js verify-asset chain.yaml dist/yaml-chain-bin-tampered.tar.gz; then
             echo "❌ Cryptographic gate failed to detect tamper!"
             exit 1
           else

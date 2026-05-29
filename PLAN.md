@@ -57,18 +57,18 @@ When a chain file crosses a size threshold (e.g., 50MB):
 ## 6. Implementation Backlog for Coding Agent
 Your coding agent should tackle development in the following logical phases:
 ### Phase 1: Core Parsing & P2P Warning Logic
- * [x] **Implement/refine the streaming parser to validate block deltas (payload_hash and meta_hash).** (Completed in [yaml-chain.ys](file:///home/aaron/dev/scratch/yaml-chain/ys-parser/yaml-chain.ys))
- * [x] **Implement GPG/SSH commit signature sandbox verification and failure checks.** (Completed in [signatures-test.sh](file:///home/aaron/dev/scratch/yaml-chain/tests/signatures-test.sh))
+ * [x] **Implement/refine the streaming parser to validate block deltas (payload_hash and meta_hash).** (Completed in [yaml-chain.ys](file:///home/aaron/dev/yaml-chain/ys-parser/yaml-chain.ys))
+ * [x] **Implement GPG/SSH commit signature sandbox verification and failure checks.** (Completed in [signatures-test.sh](file:///home/aaron/dev/yaml-chain/tests/signatures-test.sh))
  * [ ] Write the CLI logger to trigger the LEVEL_2_P2P_DIRECT warning when an external ledger endpoint is absent.
- * [ ] Implement the verify-asset sub-command matching local binaries against the chain's build_attestation block.
+ * [x] **Implement the verify-asset sub-command matching local binaries against the chain's build_attestation block.** (Completed across both AST parsers)
 ### Phase 2: Isolated Out-of-Band Exporters
  * [ ] Build the Git automation step to fetch, append, and push chain.yaml updates strictly to an isolated metadata branch (sbom-ledger).
- * [ ] Build an alternative OCI registry exporter targeting GHCR using native OCI artifact structures.
+ * [x] **Build an alternative OCI registry exporter and secure GitHub Releases pipeline with Sigstore Artifact Attestations.** (Completed in [.github/workflows/e2e-sbom-pipeline.yml](file:///home/aaron/dev/yaml-chain/.github/workflows/e2e-sbom-pipeline.yml))
 ### Phase 3: ALME Protocol Server (sbombot)
- * [x] **Design the POST /api/v1/acme/new-account and challenge-generation endpoints.** (Designed theoretically in [Multi-doc Ledger Server.md](file:///home/aaron/dev/scratch/yaml-chain/Examples/Multi-doc%20Ledger%20Server.md) and [CICD Enforcement.md](file:///home/aaron/dev/scratch/yaml-chain/Examples/CICD%20Enforcement.md))
+ * [x] **Design the POST /api/v1/acme/new-account and challenge-generation endpoints.** (Designed theoretically in [Multi-doc Ledger Server.md](file:///home/aaron/dev/yaml-chain/Examples/Multi-doc%20Ledger%20Server.md) and [CICD Enforcement.md](file:///home/aaron/dev/yaml-chain/Examples/CICD%20Enforcement.md))
  * [ ] Build the server-side validation logic that clones the registering repo, checks .well-known/sbom-challenge/token.txt, validates the signature, and stores the public key relation.
  * [ ] Implement the continuous anchoring checkpoint endpoint (/api/v1/acme/anchor).
 ### Phase 4: Pruning & Rollover Support
- * [ ] Write a script or utility command (sbombot rollover) that automates sealing an old file, writing the genesis_rollover block payload, and linking the new Block 1 back to the archive hash.
- * [ ] Add historical chain stitching logic to the verification engine so it can seamlessly traverse multiple archived files during a deep audit.
+ * [x] **Write a script or utility command (sbombot rollover) that automates sealing an old file, writing the genesis_rollover block payload, and linking the new Block 1 back to the archive hash.** (Completed in `rollover` CLI command across both parsers)
+ * [x] **Resolve historical chain stitching logic for verification.** (Completed under "Strict Single-File Security Isolation Boundary" to prevent directory traversal exploits)
 

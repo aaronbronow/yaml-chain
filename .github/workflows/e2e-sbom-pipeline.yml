@@ -4,14 +4,22 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag name for manual release testing (e.g., test-release)'
+        required: true
+        default: 'test-release'
 
 # Force strict minimal permissions for the ambient GITHUB_TOKEN
 permissions:
-  contents: read
-  id-token: write
+  contents: write      # Required to create/update releases and upload assets
+  id-token: write      # Required to generate artifact attestations using Sigstore
   packages: write      # Required to publish secure ledger OCI packages to GHCR
   attestations: write  # Required to generate artifact attestations using Sigstore
 
@@ -39,6 +47,8 @@ jobs:
     name: "Prove Hardened OCI Attestation Pipeline"
     runs-on: ubuntu-latest
     needs: run-validation-suites
+    # Only run release steps on tag pushes OR manual workflow dispatches
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     
     steps:
       - name: "Checkout Repository Source"
@@ -51,6 +61,15 @@ jobs:
 
       - name: "Set up Docker Buildx"
         uses: docker/setup-buildx-action@v3
+
+      - name: "Determine Release Tag"
+        id: tag_picker
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: "Build Parsers & Package Binary"
         run: |
@@ -93,14 +112,18 @@ jobs:
           node node-parser/bin/yaml-chain.js changelog chain.yaml -o RELEASE_NOTES.md --owner ${{ github.repository_owner }}
           cat RELEASE_NOTES.md
 
+      # Disabled OCI Steps for now (retaining code)
       - name: "Log in to GitHub Container Registry"
+        if: false
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Disabled OCI Steps for now (retaining code)
       - name: "Build & Push OCI Ledger Artifact Image"
+        if: false
         run: |
           # Generate scratch Dockerfile dynamically
           cat <<EOF > Dockerfile.artifact
@@ -137,3 +160,17 @@ jobs:
           else
             echo "✅ Security gate successfully blocked tampered binary!"
           fi
+
+      - name: "Publish Assets to GitHub Release"
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/yaml-chain-bin.tar.gz
+            chain.yaml
+            RELEASE_NOTES.md
+          body_path: RELEASE_NOTES.md
+          tag_name: ${{ steps.tag_picker.outputs.tag }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

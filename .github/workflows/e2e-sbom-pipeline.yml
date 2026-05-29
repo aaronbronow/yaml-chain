@@ -31,6 +31,7 @@ jobs:
       - name: "Install & Run Parser Validation Suite"
         run: |
           make clean
+          make build
           make test
 
   prove-hardened-pipeline:

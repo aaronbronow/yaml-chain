@@ -43,7 +43,7 @@ export function splitRawDocuments(fileContent) {
  * @param {string} initialDataText - Initial document content (arbitrary YAML)
  * @returns {Promise<object>} The created genesis block metadata
  */
-export async function initChain(filepath, initialDataText) {
+export async function initChain(filepath, initialDataText, prevMetaHash = GENESIS_PREV_HASH) {
   // Ensure the directory exists
   await fs.mkdir(path.dirname(filepath), { recursive: true });
   
@@ -57,7 +57,7 @@ export async function initChain(filepath, initialDataText) {
     timestamp: new Date().toISOString(),
     hashing_strategy: 'raw',
     data_hash: dataHash,
-    prev_meta_hash: GENESIS_PREV_HASH
+    prev_meta_hash: prevMetaHash
   };
   
   meta.meta_hash = deterministicMetaHash(meta);
@@ -188,14 +188,37 @@ function verifySingleBlock(i, dataDocStr, metaDocStr, expectedPrevHash) {
   
   // 2. Verify previous meta hash
   if (meta.prev_meta_hash !== expectedPrevHash) {
-    return {
-      valid: false,
-      reason: `Blockchain link broken at block ${i}: expected prev_meta_hash to be '${expectedPrevHash}', but found '${meta.prev_meta_hash}'.`,
-      blockIndex: i,
-      tamperedComponent: 'chain',
-      expected: expectedPrevHash,
-      actual: meta.prev_meta_hash
-    };
+    let isRollover = false;
+    if (i === 0) {
+      try {
+        const parsedData = YAML.parse(dataDocStr);
+        if (parsedData?.genesis_rollover) {
+          isRollover = true;
+        }
+      } catch (e) {
+        // Ignored
+      }
+    }
+    
+    if (isRollover) {
+      if (!/^[0-9a-fA-F]{64}$/.test(meta.prev_meta_hash)) {
+        return {
+          valid: false,
+          reason: `Invalid rollover prev_meta_hash format at block ${i}: expected 64-character SHA-256 hash, but found '${meta.prev_meta_hash}'.`,
+          blockIndex: i,
+          tamperedComponent: 'chain'
+        };
+      }
+    } else {
+      return {
+        valid: false,
+        reason: `Blockchain link broken at block ${i}: expected prev_meta_hash to be '${expectedPrevHash}', but found '${meta.prev_meta_hash}'.`,
+        blockIndex: i,
+        tamperedComponent: 'chain',
+        expected: expectedPrevHash,
+        actual: meta.prev_meta_hash
+      };
+    }
   }
   
   // 3. Verify data hash
@@ -525,5 +548,47 @@ export async function verifyAsset(chainFile, assetFile) {
     actualHash: assetHash,
     builder: foundAttestation.builder
   };
+}
+
+/**
+ * Rollovers a bloated chain to a cold archive and starts a new cryptographically linked chain.
+ * @param {string} filepath - Active chain file path
+ * @param {string} archiveFilepath - Target archive file path
+ * @returns {Promise<void>}
+ */
+export async function rolloverChain(filepath, archiveFilepath) {
+  // 1. Verify the active chain's cryptographic integrity
+  const report = await verifyChain(filepath);
+  if (!report.valid) {
+    throw new Error(`Cannot rollover an invalid or tampered chain: ${report.reason}`);
+  }
+  
+  // 2. Fetch chain status to get bridge metadata references
+  const status = await getChainStatus(filepath);
+  if (status.blockCount === 0) {
+    throw new Error('Cannot rollover an empty chain.');
+  }
+  
+  const terminalMetaHash = status.lastBlock.meta_hash;
+  const archivedBlockCount = status.blockCount;
+  const archivedTimestamp = status.lastBlock.timestamp;
+  
+  // 3. Move the current bloated chain file to the cold archive path
+  await fs.rename(filepath, archiveFilepath);
+  
+  // 4. Initialize a new chain.yaml with Block 0's prev_meta_hash set to the archive's terminal hash
+  const bridgePayload = {
+    version: '1.0.0',
+    project: 'yaml-chain-pipeline',
+    genesis_rollover: {
+      archived_chain: path.basename(archiveFilepath),
+      terminal_meta_hash: terminalMetaHash,
+      archived_block_count: archivedBlockCount,
+      archived_timestamp: archivedTimestamp
+    }
+  };
+  
+  const initialDataText = YAML.stringify(bridgePayload);
+  await initChain(filepath, initialDataText, terminalMetaHash);
 }
 

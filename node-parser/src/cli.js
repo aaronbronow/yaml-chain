@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { initChain, appendBlock, verifyChain, getChainStatus, splitRawDocuments, generateReleaseNotes, verifyAsset } from './chain.js';
+import { initChain, appendBlock, verifyChain, getChainStatus, splitRawDocuments, generateReleaseNotes, verifyAsset, rolloverChain } from './chain.js';
 import { computeDiff, formatDiffConsole } from './diff.js';
 
 const colors = {
@@ -317,6 +317,24 @@ export function createCli() {
         console.log(`${colors.gray}------------------------------------------------------------${colors.reset}`);
       } catch (err) {
         console.error(`\n❌ ${colors.red}${colors.bold}ATTESTATION FAILED:${colors.reset} ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('rollover')
+    .argument('<file>', 'Path to the yaml-chain file to rollover')
+    .requiredOption('-a, --archive <archive-file>', 'Path to save the rolled-over cold archive')
+    .description('Rollover a bloated chain to a cold archive and start a new cryptographically linked chain')
+    .action(async (file, options) => {
+      const resolvedFile = path.resolve(file);
+      const resolvedArchive = path.resolve(options.archive);
+      console.log(`🔄 ${colors.bold}Rolling over chain:${colors.reset} ${file} ➡️ ${options.archive} ...`);
+      try {
+        await rolloverChain(resolvedFile, resolvedArchive);
+        console.log(`\n✨ ${colors.green}${colors.bold}Success:${colors.reset} Chain rolled over and re-initialized at ${colors.bold}${file}${colors.reset}`);
+      } catch (err) {
+        console.error(`\n❌ ${colors.red}${colors.bold}Error performing rollover:${colors.reset} ${err.message}`);
         process.exit(1);
       }
     });

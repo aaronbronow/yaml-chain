@@ -2,7 +2,7 @@
 
 SHELL := /bin/bash
 
-.PHONY: all build release-notes install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys test-signatures clean
+.PHONY: all build release-notes install test test-unit test-shared test-cosmetic test-interop test-node test-yaml test-bash test-ys test-signatures test-rollover clean
 
 all: build test
 
@@ -22,7 +22,7 @@ install:
 	@[[ -x /tmp/ys-skill/bin/ys ]] || curl -s https://yamlscript.org/install | PREFIX=/tmp/ys-skill bash
 
 
-test: test-unit test-shared test-cosmetic test-interop test-signatures
+test: test-unit test-shared test-cosmetic test-interop test-signatures test-rollover
 	@echo ""
 	@echo "🎉==========================================================="
 	@echo "🎉 ALL TESTS PASSED ACROSS ALL FOUR PARSER IMPLEMENTATIONS!"
@@ -120,6 +120,10 @@ ys-parser/yaml-chain.ys: ys-parser/src/header.ys \
 test-signatures: ys-parser/yaml-chain.ys
 	@./tests/generate-mock-keys.sh
 	@./tests/signatures-test.sh
+
+test-rollover:
+	@echo "🧪 Running cryptographic rollover and pruning tests..."
+	@./tests/rollover-test.sh
 
 clean:
 	@echo "🧹 Cleaning up temporary test runs..."

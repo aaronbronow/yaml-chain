@@ -51,9 +51,9 @@ echo -e "📦 Spawning isolated, hardened Node build runner with dropped capabil
 
 # Create a temporary Dockerfile for isolated build
 cat <<EOF > "$run_dir/Dockerfile.builder"
-FROM node:20-alpine
+FROM cgr.dev/chainguard/node:latest-dev
 WORKDIR /app
-COPY . .
+COPY --chown=node:node . .
 RUN npm install --prefix node-parser && \
     npm install --prefix yaml-parser
 EOF
@@ -69,11 +69,12 @@ echo -e "⚡ Compiling and packaging assets in isolated container..."
 # We use docker run and copy to avoid permission problems with host mounts
 docker rm -f yaml-chain-temp-builder > /dev/null 2>&1 || true
 docker run --name yaml-chain-temp-builder \
+  --entrypoint /bin/sh \
   --cap-drop=ALL \
   --memory=512m \
   --cpus=1 \
   yaml-chain-builder \
-  sh -c "tar -czf /tmp/yaml-chain-bin.tar.gz -C /app node-parser yaml-parser bash-parser ys-parser"
+  -c "tar -czf /tmp/yaml-chain-bin.tar.gz -C /app node-parser yaml-parser bash-parser ys-parser"
 
 docker cp yaml-chain-temp-builder:/tmp/yaml-chain-bin.tar.gz "$run_dir/dist/yaml-chain-bin.tar.gz"
 docker rm yaml-chain-temp-builder > /dev/null
@@ -134,7 +135,7 @@ COPY $run_dir/chain.yaml /ledger/chain.yaml
 COPY $run_dir/RELEASE_NOTES.md /ledger/RELEASE_NOTES.md
 EOF
 
-oci_tag="localhost:${registry_port}/yaml-chain-ledger:1.1.0-attested"
+oci_tag="${OCI_TAG:-localhost:${registry_port}/yaml-chain-ledger:1.1.0-attested}"
 echo -e "🏗️  Building OCI artifact image: ${colors_bold}${oci_tag}${colors_reset}..."
 docker build -t "${oci_tag}" -f "$run_dir/Dockerfile.artifact" . > /dev/null
 

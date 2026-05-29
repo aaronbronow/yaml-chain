@@ -1,0 +1,127 @@
+name: "Security: Cryptographic SBOM & E2E Validation"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Force strict minimal permissions for the ambient GITHUB_TOKEN
+permissions:
+  contents: read
+  id-token: write
+  packages: write  # Required to publish secure ledger OCI packages to GHCR
+
+jobs:
+  run-validation-suites:
+    name: "Run Shared Multi-Parser Test Suite"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: "Checkout Repository Source"
+        uses: actions/checkout@v4
+        
+      - name: "Set up Node.js Environment"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: "Install & Run Parser Validation Suite"
+        run: |
+          make clean
+          make test
+
+  prove-hardened-pipeline:
+    name: "Prove Hardened OCI Attestation Pipeline"
+    runs-on: ubuntu-latest
+    needs: run-validation-suites
+    
+    steps:
+      - name: "Checkout Repository Source"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js Environment"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v3
+
+      - name: "Build Parsers & Package Binary"
+        run: |
+          make build
+          mkdir -p dist
+          tar -czf dist/yaml-chain-bin.tar.gz node-parser yaml-parser bash-parser ys-parser
+
+      - name: "Create Cryptographic Attestation Block"
+        run: |
+          # Compute artifact SHA-256
+          ASSET_HASH=$(sha256sum dist/yaml-chain-bin.tar.gz | awk '{print $1}')
+          echo "Asset Hash: $ASSET_HASH"
+          
+          # Initialize ledger (or use existing)
+          node node-parser/bin/yaml-chain.js init chain.yaml -d $'version: 1.0.0\nproject: yaml-chain-pipeline\nmessage: "Genesis block for attested release pipeline."'
+          
+          # Construct and append attestation payload
+          ATTESTATION_PAYLOAD=$(cat <<EOF
+          build_attestation:
+            asset_name: "yaml-chain-bin.tar.gz"
+            asset_hash: "$ASSET_HASH"
+            builder: "GitHub Actions Runner"
+            timestamp: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          EOF
+          )
+          node node-parser/bin/yaml-chain.js append chain.yaml -d "$ATTESTATION_PAYLOAD"
+          
+          # Construct and append version changes
+          VERSION_PAYLOAD=$(cat <<EOF
+          version: 1.1.0
+          changes:
+            - Native GitHub Actions security validation pipeline
+            - Automatic attestation generation and ledger syncing
+          EOF
+          )
+          node node-parser/bin/yaml-chain.js append chain.yaml -d "$VERSION_PAYLOAD"
+
+      - name: "Generate SBOM Release Notes Changelog"
+        run: |
+          node node-parser/bin/yaml-chain.js changelog chain.yaml -o RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: "Log in to GitHub Container Registry"
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Build & Push OCI Ledger Artifact Image"
+        run: |
+          # Generate scratch Dockerfile dynamically
+          cat <<EOF > Dockerfile.artifact
+          FROM scratch
+          COPY dist/yaml-chain-bin.tar.gz /artifacts/yaml-chain-bin.tar.gz
+          COPY chain.yaml /ledger/chain.yaml
+          COPY RELEASE_NOTES.md /ledger/RELEASE_NOTES.md
+          EOF
+          
+          IMAGE_TAG="ghcr.io/${{ github.repository }}/yaml-chain-ledger:latest"
+          docker build -t $IMAGE_TAG -f Dockerfile.artifact .
+          docker push $IMAGE_TAG
+
+      - name: "Enforce Security Attestation Gate (Verify Untampered)"
+        run: |
+          node node-parser/bin/yaml-chain.js verify-asset chain.yaml dist/yaml-chain-bin.tar.gz
+
+      - name: "Simulate Tamper Attack & Verify Gate Rejection"
+        run: |
+          echo "## EVIL TAMPER ##" >> dist/yaml-chain-bin.tar.gz
+          if node node-parser/bin/yaml-chain.js verify-asset chain.yaml dist/yaml-chain-bin.tar.gz; then
+            echo "❌ Cryptographic gate failed to detect tamper!"
+            exit 1
+          else
+            echo "✅ Security gate successfully blocked tampered binary!"
+          fi

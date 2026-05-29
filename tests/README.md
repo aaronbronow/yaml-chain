@@ -70,6 +70,43 @@ The secure CI/CD experiment (`tests/cicd-experiment.sh`) simulates a production 
 
 ---
 
+## 🛡️ Production CI/CD Pipeline & GitHub Artifact Attestations
+
+In addition to the local OCI registry simulation, the `yaml-chain` repository is configured with a live, production-grade GitHub Actions pipeline at [.github/workflows/e2e-sbom-pipeline.yml](file://../.github/workflows/e2e-sbom-pipeline.yml) which integrates official **GitHub Artifact Attestations** (backed by Sigstore and OIDC).
+
+### Architectural Overview & Security Controls
+
+* **Cryptographic Attestations (Sigstore Integration):** During the release execution, the runner VM uses `actions/attest@v4` to mint an unfalsifiable build provenance attestation for both the compiled binary `yaml-chain-bin.tar.gz` and the secure SBOM ledger `chain.yaml`. The cryptographic signature is transparently published to Sigstore's Rekor log.
+* **Separation of Concerns & Triggers:** 
+  * **Standard Commits/PRs:** Only execute the shared verification and unit test suites to protect the integrity of git tags.
+  * **Tags (`v*`) & Manual Dispatch (`workflow_dispatch`):** Run the complete secure build, minting, and release cycle. This allows thorough end-to-end pipeline verification using manual testing tags (e.g. `test-release-v1`) without cluttering tags or polluting `main`.
+* **Elevated Token Permissions:** The GITHUB_TOKEN drops all ambient permissions, preserving only:
+  * `contents: write` — to securely generate the release and upload assets.
+  * `id-token: write` & `attestations: write` — to negotiate cryptographic identity with Sigstore via OIDC and upload attestations.
+* **OCI Registry Skip Logic:** For release scenarios where OCI publishing is bypassed, the OCI registry login and upload steps are skipped via `if: false` conditionals, keeping the code fully syntax-validated but offline.
+
+### Manual Attestation Verification
+
+When a release is created, the pre-compiled assets (`yaml-chain-bin.tar.gz` and `chain.yaml`) and the changelog (`RELEASE_NOTES.md`) are published to the repository's GitHub Releases tab. 
+
+To verify the cryptographically signed build provenance of any downloaded release asset, install the [GitHub CLI](https://cli.github.com/) and run:
+
+```bash
+# Verify the compiled binary provenance
+gh attestation verify yaml-chain-bin.tar.gz --repo aaronbronow/yaml-chain
+
+# Verify the secure SBOM ledger provenance
+gh attestation verify chain.yaml --repo aaronbronow/yaml-chain
+```
+
+This enforces strict validation checks, proving that:
+1. The binary was natively built on a secure GitHub-hosted runner.
+2. The source repository is exactly `aaronbronow/yaml-chain`.
+3. The build was triggered from our official workflow definition.
+4. The contents have not been tampered with or backdoored.
+
+---
+
 ## 🛠️ Running the Suites
 
 To run the complete standard suite of tests:

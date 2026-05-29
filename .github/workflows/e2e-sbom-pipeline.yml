@@ -2,13 +2,8 @@ name: "Security: Cryptographic SBOM & E2E Validation"
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_tag:
